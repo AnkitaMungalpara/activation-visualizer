@@ -1,119 +1,656 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Activation Visualizer</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-    body { font-family: Arial; margin: 30px; }
-    h1 { text-align: center; }
-    .controls { margin-bottom: 20px; text-align: center; }
-    select, input { margin: 5px; padding: 5px; font-size: 1rem; }
-    canvas { max-width: 900px; margin: auto; display: block; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Activation Visualizer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --accent-color: #3b82f6;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --dark-bg: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --border-color: #334155;
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-accent: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--dark-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(168, 85, 247, 0.1) 0%, transparent 50%);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            text-shadow: var(--shadow-lg);
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .controls-panel {
+            background: var(--card-bg);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-primary);
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 2rem;
+            align-items: end;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .input-label {
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .input-field {
+            background: rgba(15, 23, 42, 0.8);
+            border: 2px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .activation-select {
+            background: rgba(15, 23, 42, 0.8);
+            border: 2px solid var(--border-color);
+            border-radius: 0.75rem;
+            color: var(--text-primary);
+            min-height: 120px;
+            padding: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .activation-select option {
+            padding: 0.5rem;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border: none;
+            border-radius: 0.5rem;
+            margin: 0.25rem 0;
+        }
+
+        .activation-select option:checked {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .activation-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .compute-btn {
+            background: var(--gradient-primary);
+            border: none;
+            border-radius: 1rem;
+            padding: 1rem 2rem;
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            min-width: 140px;
+        }
+
+        .compute-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .compute-btn:hover::before {
+            left: 100%;
+        }
+
+        .compute-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px -5px rgba(37, 99, 235, 0.4);
+        }
+
+        .compute-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .chart-container {
+            background: var(--card-bg);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-accent);
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 500px;
+            width: 100%;
+        }
+
+        #activationChart {
+            max-width: 100%;
+            border-radius: 1rem;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error-color);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            color: var(--error-color);
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .success-message {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success-color);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            color: var(--success-color);
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .activation-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .badge {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 0.25rem 0.75rem;
+            border-radius: 2rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .controls-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .controls-panel {
+                padding: 1.5rem;
+            }
+
+            .chart-container {
+                padding: 1.5rem;
+            }
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--card-bg);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--secondary-color);
+        }
+    </style>
 </head>
 <body>
 
-<h1>Neural Activation Visualizer</h1>
+<div class="container">
+    <div class="header">
+        <h1><i class="fas fa-brain"></i> Neural Activation Visualizer</h1>
+        <p>Explore and visualize different neural network activation functions in real-time</p>
+    </div>
 
-<div class="controls">
-    <label>Input (comma-separated): <input id="inputX" value="1,2,3,4,5"></label>
-    <label>Activation:
-        <select id="activationFn" multiple size="5">
-            <option value="relu">ReLU</option>
-            <option value="leaky_relu">Leaky ReLU</option>
-            <option value="sigmoid">Sigmoid</option>
-            <option value="tanh">Tanh</option>
-            <option value="gelu">GELU</option>
-        </select>
-    </label>
-    <button onclick="computeActivation()">Compute</button>
+    <div class="controls-panel">
+        <div class="controls-grid">
+            <div class="input-group">
+                <label class="input-label">
+                    <i class="fas fa-list-ol"></i> Input Values
+                </label>
+                <input 
+                    id="inputX" 
+                    class="input-field" 
+                    value="1,2,3,4,5"
+                    placeholder="e.g., 1,2,3,4,5 or -5,-4,-3,-2,-1,0,1,2,3,4,5"
+                >
+                <div class="activation-badges">
+                    <span class="badge">Comma-separated values</span>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">
+                    <i class="fas fa-function"></i> Activation Functions
+                </label>
+                <select id="activationFn" class="activation-select" multiple size="5">
+                    <option value="relu">ReLU (Rectified Linear)</option>
+                    <option value="leaky_relu">Leaky ReLU</option>
+                    <option value="sigmoid">Sigmoid</option>
+                    <option value="tanh">Tanh (Hyperbolic Tangent)</option>
+                    <option value="gelu">GELU (Gaussian Error Linear)</option>
+                </select>
+                <div class="activation-badges">
+                    <span class="badge">Hold Ctrl/Cmd for multiple</span>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <button class="compute-btn" onclick="computeActivation()">
+                    <i class="fas fa-calculator"></i> Compute
+                </button>
+            </div>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
+    </div>
+
+    <div class="chart-container">
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Computing activation functions...</p>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="activationChart"></canvas>
+        </div>
+    </div>
 </div>
-
-<canvas id="activationChart" width="800" height="500"></canvas>
 
 <script>
 let chart;
 
-// Assign colors for different activation functions
+// Enhanced color palette for activation functions
 const colors = {
-    relu: 'rgba(75,192,192,1)',
-    leaky_relu: 'rgba(192,75,192,1)',
-    sigmoid: 'rgba(192,192,75,1)',
-    tanh: 'rgba(75,75,192,1)',
-    gelu: 'rgba(192,75,75,1)'
+    relu: {
+        border: 'rgba(59, 130, 246, 1)',
+        background: 'rgba(59, 130, 246, 0.1)',
+        gradient: 'rgba(59, 130, 246, 0.3)'
+    },
+    leaky_relu: {
+        border: 'rgba(168, 85, 247, 1)',
+        background: 'rgba(168, 85, 247, 0.1)',
+        gradient: 'rgba(168, 85, 247, 0.3)'
+    },
+    sigmoid: {
+        border: 'rgba(34, 197, 94, 1)',
+        background: 'rgba(34, 197, 94, 0.1)',
+        gradient: 'rgba(34, 197, 94, 0.3)'
+    },
+    tanh: {
+        border: 'rgba(239, 68, 68, 1)',
+        background: 'rgba(239, 68, 68, 0.1)',
+        gradient: 'rgba(239, 68, 68, 0.3)'
+    },
+    gelu: {
+        border: 'rgba(245, 158, 11, 1)',
+        background: 'rgba(245, 158, 11, 0.1)',
+        gradient: 'rgba(245, 158, 11, 0.3)'
+    }
 };
 
-async function computeActivation() {
-    const x = document.getElementById("inputX").value.split(",").map(Number);
-    const fn_select = document.getElementById("activationFn");
-    const selectedFns = Array.from(fn_select.selectedOptions).map(opt => opt.value);
-
-    if (selectedFns.length === 0) {
-        alert("Please select at least one activation function.");
-        return;
+function showMessage(message, type) {
+    const errorEl = document.getElementById('errorMessage');
+    const successEl = document.getElementById('successMessage');
+    
+    errorEl.style.display = 'none';
+    successEl.style.display = 'none';
+    
+    if (type === 'error') {
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+        setTimeout(() => errorEl.style.display = 'none', 5000);
+    } else if (type === 'success') {
+        successEl.textContent = message;
+        successEl.style.display = 'block';
+        setTimeout(() => successEl.style.display = 'none', 3000);
     }
+}
 
-    const datasets = [];
+function showLoading(show) {
+    document.getElementById('loading').classList.toggle('active', show);
+}
 
-    for (let fn_name of selectedFns) {
-        const response = await fetch("http://127.0.0.1:8000/compute", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ x, fn_name })
+async function computeActivation() {
+    const inputEl = document.getElementById("inputX");
+    const fnSelect = document.getElementById("activationFn");
+    
+    try {
+        const x = inputEl.value.split(",").map(val => {
+            const num = Number(val.trim());
+            if (isNaN(num)) throw new Error(`Invalid number: ${val.trim()}`);
+            return num;
         });
+        
+        const selectedFns = Array.from(fnSelect.selectedOptions).map(opt => opt.value);
 
-        const data = await response.json();
-
-        if (data.error) {
-            alert(data.error);
+        if (selectedFns.length === 0) {
+            showMessage("Please select at least one activation function.", "error");
             return;
         }
 
-        const output = data.output.flat();
+        if (x.length === 0) {
+            showMessage("Please enter at least one input value.", "error");
+            return;
+        }
 
-        datasets.push({
-            label: fn_name,
-            data: output,
-            borderColor: colors[fn_name],
-            backgroundColor: colors[fn_name].replace('1)', '0.2)'),
-            tension: 0.3,
-            fill: true,
-            pointHoverRadius: 7
-        });
-    }
+        showLoading(true);
+        const datasets = [];
 
-    if (chart) chart.destroy();
+        for (let fn_name of selectedFns) {
+            try {
+                // Note: This assumes your FastAPI backend is running on localhost:8000
+                // In production, you'd want to make this configurable
+                const response = await fetch("http://127.0.0.1:8000/compute", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ x, fn_name })
+                });
 
-    chart = new Chart(document.getElementById("activationChart"), {
-        type: 'line',
-        data: {
-            labels: x,
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { display: true, position: 'top' },
-                tooltip: {
-                    enabled: true,
-                    mode: 'nearest',
-                    intersect: false,
-                    callbacks: {
-                        label: function(context) {
-                            return `${context.dataset.label}: ${context.parsed.y.toFixed(4)}`;
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                const output = data.output.flat();
+                const color = colors[fn_name];
+
+                datasets.push({
+                    label: fn_name.toUpperCase().replace('_', ' '),
+                    data: output,
+                    borderColor: color.border,
+                    backgroundColor: color.background,
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                    pointBackgroundColor: color.border,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2
+                });
+            } catch (error) {
+                showMessage(`Error computing ${fn_name}: ${error.message}`, "error");
+                showLoading(false);
+                return;
+            }
+        }
+
+        if (chart) chart.destroy();
+
+        const ctx = document.getElementById("activationChart");
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: x.map(val => val.toString()),
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#cbd5e1',
+                            padding: 20,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            font: {
+                                size: 12,
+                                weight: '600'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#cbd5e1',
+                        borderColor: '#334155',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.parsed.y.toFixed(4)}`;
+                            }
                         }
                     }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Input Values',
+                            color: '#cbd5e1',
+                            font: { size: 14, weight: '600' }
+                        },
+                        ticks: { color: '#94a3b8' },
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)',
+                            drawBorder: false
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Activation Output',
+                            color: '#cbd5e1',
+                            font: { size: 14, weight: '600' }
+                        },
+                        ticks: { color: '#94a3b8' },
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)',
+                            drawBorder: false
+                        }
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                },
+                animation: {
+                    duration: 1000,
+                    easing: 'easeOutQuart'
                 }
-            },
-            scales: {
-                x: { title: { display: true, text: 'Input x' } },
-                y: { title: { display: true, text: 'Activation Output' } }
-            },
-            hover: { mode: 'nearest', intersect: true }
-        }
-    });
+            }
+        });
+
+        showMessage(`Successfully computed ${selectedFns.length} activation function(s)!`, "success");
+        
+    } catch (error) {
+        showMessage(`Error: ${error.message}`, "error");
+    } finally {
+        showLoading(false);
+    }
 }
+
+// Add keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            computeActivation();
+        }
+    }
+});
+
+// Add input validation
+document.getElementById('inputX').addEventListener('input', function(e) {
+    const value = e.target.value;
+    const isValid = /^-?\d*\.?\d*(?:,-?\d*\.?\d*)*$/.test(value) || value === '';
+    
+    if (!isValid && value !== '') {
+        e.target.style.borderColor = 'var(--error-color)';
+    } else {
+        e.target.style.borderColor = 'var(--border-color)';
+    }
+});
+
+// Initialize with default computation
+window.addEventListener('load', function() {
+    // Select ReLU by default
+    document.getElementById('activationFn').options[0].selected = true;
+    setTimeout(() => computeActivation(), 500);
+});
 </script>
 
 </body>
