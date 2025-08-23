@@ -1,34 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Activation Function Explorer</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<title>Activation Visualizer</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    body { font-family: Arial; margin: 30px; }
+    h1 { text-align: center; }
+    .controls { margin-bottom: 20px; text-align: center; }
+    select, input { margin: 5px; padding: 5px; font-size: 1rem; }
+    canvas { max-width: 700px; margin: auto; display: block; }
+</style>
 </head>
 <body>
-    <h1>Activation Function Explorer</h1>
 
-    <div>
-        <label for="function">Choose Activation Function:</label>
-        <select id="function">
+<h1>Neural Network Activation Function Visualizer</h1>
+
+<div class="controls">
+    <label>Input (comma-separated): <input id="inputX" value="1,2,3,4,5"></label>
+    <label>Activation: 
+        <select id="activationFn">
             <option value="relu">ReLU</option>
             <option value="leaky_relu">Leaky ReLU</option>
             <option value="sigmoid">Sigmoid</option>
             <option value="tanh">Tanh</option>
             <option value="gelu">GELU</option>
         </select>
-    </div>
+    </label>
+    <button onclick="computeActivation()">Compute</button>
+</div>
 
-    <div>
-        <label for="inputRange">Input Range (-10 to 10):</label>
-        <input type="number" id="minX" value="-10" step="1">
-        <input type="number" id="maxX" value="10" step="1">
-        <button onclick="plotActivation()">Plot</button>
-    </div>
+<canvas id="activationChart" width="900" height="500"></canvas>
 
-    <div id="plot"></div>
+<script>
+let chart;
 
-    <script src="script.js"></script>
+async function computeActivation() {
+    const x = document.getElementById("inputX").value.split(",").map(Number);
+    const fn_name = document.getElementById("activationFn").value;
+
+    const response = await fetch("http://127.0.0.1:8000/compute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ x, fn_name })
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+        alert(data.error);
+        return;
+    }
+
+    const output = data.output.flat();
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(document.getElementById("activationChart"), {
+        type: 'line',
+        data: {
+            labels: x,
+            datasets: [{
+                label: fn_name,
+                data: output,
+                borderColor: 'rgba(75,192,192,1)',
+                backgroundColor: 'rgba(75,192,192,0.2)',
+                tension: 0.3,
+                fill: true,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: true } },
+            scales: {
+                x: { title: { display: true, text: 'Input x' } },
+                y: { title: { display: true, text: 'Activation Output' } }
+            }
+        }
+    });
+}
+</script>
+
 </body>
 </html>

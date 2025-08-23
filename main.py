@@ -1,49 +1,56 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Optional
-from activations import relu, leaky_relu, sigmoid, tanh, gelu, layer_output
 from fastapi.middleware.cors import CORSMiddleware
+from activations import relu, leaky_relu, sigmoid, tanh, gelu, layer_output
 
-app = FastAPI(title="Activation Function Explorer")
+app = FastAPI()
 
-# Allow frontend to access API
+# Enable CORS for local frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # you can set your frontend origin instead of "*" for security
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
 # Request model
-class ActivationRequest(BaseModel):
+class ComputeRequest(BaseModel):
     x: List[float]
-    function: str
-    alpha: Optional[float] = 0.01
+    fn_name: str
     weights: Optional[List[List[float]]] = None
     bias: Optional[List[float]] = None
+    alpha: Optional[float] = 0.01  # for Leaky ReLU
+
+# Map names to activation functions
+fn_map = {
+    "relu": relu,
+    "leaky_relu": lambda x: leaky_relu(x, alpha=0.01),  # default alpha
+    "sigmoid": sigmoid,
+    "tanh": tanh,
+    "gelu": gelu,
+}
 
 @app.post("/compute")
-def compute_activation(req: ActivationRequest):
+def compute_activation(req: ComputeRequest):
     x = req.x
-    fn_name = req.function.lower()
-    
-    fn_map = {
-        "relu": relu,
-        "leaky_relu": lambda x: leaky_relu(x, req.alpha),
-        "sigmoid": sigmoid,
-        "tanh": tanh,
-        "gelu": gelu
-    }
+    fn_name = req.fn_name.lower()
     
     if fn_name not in fn_map:
-        return {"error": f"Function {req.function} not supported."}
+        return {"error": f"Activation {fn_name} not supported."}
     
-    # Optional: simulate layer
-    if req.weights or req.bias:
-        result = layer_output(x, req.weights, req.bias, activation_fn=fn_map[fn_name])
-    else:
-        result = fn_map[fn_name](x)
+    # Update alpha if provided
+    if fn_name == "leaky_relu" and req.alpha is not None:
+        fn_map["leaky_relu"] = lambda x: leaky_relu(x, alpha=req.alpha)
     
-    return {"input": x, "function": fn_name, "output": result}
+    try:
+        output = layer_output(
+            x=x,
+            weights=req.weights,
+            bias=req.bias,
+            activation_fn=fn_map[fn_name]
+        )
+    except ValueError as e:
+        return {"error": str(e)}
+    
+    return {"output": output.tolist()}
