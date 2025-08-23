@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Activation Function Explorer</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Activation Function Explorer</h1>
+
+    <div>
+        <label for="function">Choose Activation Function:</label>
+        <select id="function">
+            <option value="relu">ReLU</option>
+            <option value="leaky_relu">Leaky ReLU</option>
+            <option value="sigmoid">Sigmoid</option>
+            <option value="tanh">Tanh</option>
+            <option value="gelu">GELU</option>
+        </select>
+    </div>
+
+    <div>
+        <label for="inputRange">Input Range (-10 to 10):</label>
+        <input type="number" id="minX" value="-10" step="1">
+        <input type="number" id="maxX" value="10" step="1">
+        <button onclick="plotActivation()">Plot</button>
+    </div>
+
+    <div id="plot"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
