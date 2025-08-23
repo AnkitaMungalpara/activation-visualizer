@@ -9,17 +9,17 @@
     h1 { text-align: center; }
     .controls { margin-bottom: 20px; text-align: center; }
     select, input { margin: 5px; padding: 5px; font-size: 1rem; }
-    canvas { max-width: 700px; margin: auto; display: block; }
+    canvas { max-width: 900px; margin: auto; display: block; }
 </style>
 </head>
 <body>
 
-<h1>Neural Network Activation Function Visualizer</h1>
+<h1>Neural Activation Visualizer</h1>
 
 <div class="controls">
     <label>Input (comma-separated): <input id="inputX" value="1,2,3,4,5"></label>
-    <label>Activation: 
-        <select id="activationFn">
+    <label>Activation:
+        <select id="activationFn" multiple size="5">
             <option value="relu">ReLU</option>
             <option value="leaky_relu">Leaky ReLU</option>
             <option value="sigmoid">Sigmoid</option>
@@ -30,29 +30,58 @@
     <button onclick="computeActivation()">Compute</button>
 </div>
 
-<canvas id="activationChart" width="900" height="500"></canvas>
+<canvas id="activationChart" width="800" height="500"></canvas>
 
 <script>
 let chart;
 
+// Assign colors for different activation functions
+const colors = {
+    relu: 'rgba(75,192,192,1)',
+    leaky_relu: 'rgba(192,75,192,1)',
+    sigmoid: 'rgba(192,192,75,1)',
+    tanh: 'rgba(75,75,192,1)',
+    gelu: 'rgba(192,75,75,1)'
+};
+
 async function computeActivation() {
     const x = document.getElementById("inputX").value.split(",").map(Number);
-    const fn_name = document.getElementById("activationFn").value;
+    const fn_select = document.getElementById("activationFn");
+    const selectedFns = Array.from(fn_select.selectedOptions).map(opt => opt.value);
 
-    const response = await fetch("http://127.0.0.1:8000/compute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ x, fn_name })
-    });
-
-    const data = await response.json();
-
-    if (data.error) {
-        alert(data.error);
+    if (selectedFns.length === 0) {
+        alert("Please select at least one activation function.");
         return;
     }
 
-    const output = data.output.flat();
+    const datasets = [];
+
+    for (let fn_name of selectedFns) {
+        const response = await fetch("http://127.0.0.1:8000/compute", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ x, fn_name })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        const output = data.output.flat();
+
+        datasets.push({
+            label: fn_name,
+            data: output,
+            borderColor: colors[fn_name],
+            backgroundColor: colors[fn_name].replace('1)', '0.2)'),
+            tension: 0.3,
+            fill: true,
+            pointHoverRadius: 7
+        });
+    }
 
     if (chart) chart.destroy();
 
@@ -60,22 +89,28 @@ async function computeActivation() {
         type: 'line',
         data: {
             labels: x,
-            datasets: [{
-                label: fn_name,
-                data: output,
-                borderColor: 'rgba(75,192,192,1)',
-                backgroundColor: 'rgba(75,192,192,0.2)',
-                tension: 0.3,
-                fill: true,
-            }]
+            datasets: datasets
         },
         options: {
             responsive: true,
-            plugins: { legend: { display: true } },
+            plugins: {
+                legend: { display: true, position: 'top' },
+                tooltip: {
+                    enabled: true,
+                    mode: 'nearest',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.parsed.y.toFixed(4)}`;
+                        }
+                    }
+                }
+            },
             scales: {
                 x: { title: { display: true, text: 'Input x' } },
                 y: { title: { display: true, text: 'Activation Output' } }
-            }
+            },
+            hover: { mode: 'nearest', intersect: true }
         }
     });
 }
