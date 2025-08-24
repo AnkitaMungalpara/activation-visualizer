@@ -45,6 +45,15 @@ def layer_output(x, weights=None, bias=None, activation_fn=relu):
     Returns:
         np.ndarray of activated outputs
     """
+    x = np.array(x)
+    
+    # If no weights/bias, treat as element-wise activation (for plotting)
+    if weights is None and bias is None:
+        if activation_fn is not None:
+            return activation_fn(x)
+        return x
+    
+    # Neural network layer computation
     x = np.atleast_2d(x)  # ensure 2D: (n_samples, n_features)
     
     if weights is not None:

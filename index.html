@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neural Activation Visualizer</title>
+    <title>NeuralGraph - Neural Activation Function Playground</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
             --primary-color: #2563eb;
-            --secondary-color: #1e40af;
+            --secondary-color: #080c1a;
             --accent-color: #3b82f6;
             --success-color: #10b981;
             --warning-color: #f59e0b;
@@ -283,6 +283,18 @@
             display: none;
         }
 
+        .debug-info {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid var(--primary-color);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            color: var(--primary-color);
+            margin-top: 1rem;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+        }
+
         .activation-badges {
             display: flex;
             flex-wrap: wrap;
@@ -323,7 +335,6 @@
             }
         }
 
-        /* Custom scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
         }
@@ -373,7 +384,7 @@
                     <i class="fas fa-function"></i> Activation Functions
                 </label>
                 <select id="activationFn" class="activation-select" multiple size="5">
-                    <option value="relu">ReLU (Rectified Linear)</option>
+                    <option value="relu" selected>ReLU (Rectified Linear)</option>
                     <option value="leaky_relu">Leaky ReLU</option>
                     <option value="sigmoid">Sigmoid</option>
                     <option value="tanh">Tanh (Hyperbolic Tangent)</option>
@@ -393,6 +404,7 @@
 
         <div class="error-message" id="errorMessage"></div>
         <div class="success-message" id="successMessage"></div>
+        <div class="debug-info" id="debugInfo" style="display: none;"></div>
     </div>
 
     <div class="chart-container">
@@ -409,7 +421,6 @@
 <script>
 let chart;
 
-// Enhanced color palette for activation functions
 const colors = {
     relu: {
         border: 'rgba(59, 130, 246, 1)',
@@ -448,7 +459,7 @@ function showMessage(message, type) {
     if (type === 'error') {
         errorEl.textContent = message;
         errorEl.style.display = 'block';
-        setTimeout(() => errorEl.style.display = 'none', 5000);
+        setTimeout(() => errorEl.style.display = 'none', 10000);
     } else if (type === 'success') {
         successEl.textContent = message;
         successEl.style.display = 'block';
@@ -456,22 +467,45 @@ function showMessage(message, type) {
     }
 }
 
+function showDebugInfo(info) {
+    const debugEl = document.getElementById('debugInfo');
+    debugEl.textContent = JSON.stringify(info, null, 2);
+    debugEl.style.display = 'block';
+    setTimeout(() => debugEl.style.display = 'none', 15000);
+}
+
 function showLoading(show) {
     document.getElementById('loading').classList.toggle('active', show);
 }
 
 async function computeActivation() {
+    console.log("=== Starting computeActivation ===");
+    
     const inputEl = document.getElementById("inputX");
     const fnSelect = document.getElementById("activationFn");
     
     try {
-        const x = inputEl.value.split(",").map(val => {
-            const num = Number(val.trim());
-            if (isNaN(num)) throw new Error(`Invalid number: ${val.trim()}`);
+        // Parse input values
+        const inputValue = inputEl.value.trim();
+        console.log("Raw input value:", inputValue);
+        
+        if (!inputValue) {
+            showMessage("Please enter input values.", "error");
+            return;
+        }
+        
+        const x = inputValue.split(",").map(val => {
+            const trimmed = val.trim();
+            const num = Number(trimmed);
+            if (isNaN(num)) throw new Error(`Invalid number: ${trimmed}`);
             return num;
         });
         
+        console.log("Parsed x values:", x);
+        
+        // Get selected functions
         const selectedFns = Array.from(fnSelect.selectedOptions).map(opt => opt.value);
+        console.log("Selected functions:", selectedFns);
 
         if (selectedFns.length === 0) {
             showMessage("Please select at least one activation function.", "error");
@@ -487,26 +521,52 @@ async function computeActivation() {
         const datasets = [];
 
         for (let fn_name of selectedFns) {
+            console.log(`\n--- Processing ${fn_name} ---`);
+            
             try {
-                // Note: This assumes your FastAPI backend is running on localhost:8000
-                // In production, you'd want to make this configurable
-                const response = await fetch("http://127.0.0.1:8000/compute", {
+                // Create payload
+                const payload = { x: x, function: fn_name };
+                console.log("Sending payload:", payload);
+                
+                // Make API call to your local FastAPI server
+                const response = await fetch("/compute", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ x, fn_name })
+                    body: JSON.stringify(payload)
                 });
 
+                console.log("Response status:", response.status);
+                console.log("Response ok:", response.ok);
+
+                // Get response text first to debug
+                const responseText = await response.text();
+                console.log("Raw response:", responseText);
+
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error(`HTTP ${response.status}: ${responseText}`);
                 }
 
-                const data = await response.json();
+                // Parse JSON
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    throw new Error(`JSON parse error: ${parseError.message}`);
+                }
+                
+                console.log("Parsed response data:", data);
 
                 if (data.error) {
-                    throw new Error(data.error);
+                    throw new Error(`API Error: ${data.error}`);
                 }
 
-                const output = data.output.flat();
+                if (!data.output || !Array.isArray(data.output)) {
+                    throw new Error(`Invalid output format: ${JSON.stringify(data)}`);
+                }
+
+                const output = Array.isArray(data.output[0]) ? data.output.flat() : data.output;
+                console.log("Final output array:", output);
+                
                 const color = colors[fn_name];
 
                 datasets.push({
@@ -516,23 +576,40 @@ async function computeActivation() {
                     backgroundColor: color.background,
                     borderWidth: 3,
                     tension: 0.4,
-                    fill: true,
+                    fill: false,
                     pointRadius: 5,
                     pointHoverRadius: 8,
                     pointBackgroundColor: color.border,
                     pointBorderColor: '#fff',
                     pointBorderWidth: 2
                 });
+                
             } catch (error) {
+                console.error(`Error computing ${fn_name}:`, error);
                 showMessage(`Error computing ${fn_name}: ${error.message}`, "error");
+                showDebugInfo({
+                    function: fn_name,
+                    input: x,
+                    error: error.message,
+                    stack: error.stack
+                });
                 showLoading(false);
                 return;
             }
         }
 
-        if (chart) chart.destroy();
+        console.log("All datasets created:", datasets);
 
+        // Destroy existing chart
+        if (chart) {
+            chart.destroy();
+            console.log("Previous chart destroyed");
+        }
+
+        // Create new chart
         const ctx = document.getElementById("activationChart");
+        console.log("Canvas element:", ctx);
+        
         chart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -613,13 +690,21 @@ async function computeActivation() {
                 }
             }
         });
+        
+        console.log("Chart created successfully:", chart);
 
         showMessage(`Successfully computed ${selectedFns.length} activation function(s)!`, "success");
         
     } catch (error) {
+        console.error("Main error:", error);
         showMessage(`Error: ${error.message}`, "error");
+        showDebugInfo({
+            error: error.message,
+            stack: error.stack
+        });
     } finally {
         showLoading(false);
+        console.log("=== computeActivation finished ===");
     }
 }
 
@@ -647,9 +732,8 @@ document.getElementById('inputX').addEventListener('input', function(e) {
 
 // Initialize with default computation
 window.addEventListener('load', function() {
-    // Select ReLU by default
-    document.getElementById('activationFn').options[0].selected = true;
-    setTimeout(() => computeActivation(), 500);
+    console.log("Page loaded, starting initial computation");
+    setTimeout(() => computeActivation(), 1000);
 });
 </script>
 
